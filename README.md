@@ -1,1 +1,0 @@
-# earthobservation_r
