@@ -1,0 +1,194 @@
+---
+title: "Remote Sensing Image Analysis using R"
+author: "Rubiere Ramirez,<br> GIS Assistant,<br> Systems Development and Data Processing,<br> Statistical Institute of Belize"
+date: "05-February-2023<br><br><b>Contact:</b> rramirez@mail.sib.org.bz"
+output: 
+  html_document:
+  toc: true
+  toc_depth: 2
+  toc_float: true
+  theme: readthedown
+---
+
+
+<style type="text/css">
+
+h1.title {
+  font-size: 38px;
+  color: Black;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 18px;
+  font-family: "Times New Roman", Times, serif;
+  color: Black;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 18px;
+  font-family: "Times New Roman", Times, serif;
+  color: Black;
+  text-align: center;
+}
+
+h2 {
+font-weight: bold;
+}
+
+.leaflet {
+    margin: auto;
+}
+
+</style>
+This is a step-by-step guide on how to perform Remote Sensing Image Analysis and Change Detection (NDVI) in R. <br>
+R version 4.2.2 (2022-10-31 ucrt). <br>
+R Studio version 2022.12.0.353.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<b>Background:</b>
+
+Normalized Difference Vegetation Index (NDVI) quantifies vegetation by measuring the difference between near-infrared (which vegetation strongly reflects) and red light (which vegetation absorbs). NDVI always ranges from -1 to +1. 
+
+For example, when you have negative values, it’s highly likely that it’s water. On the other hand, if you have an NDVI value close to +1, there’s a high possibility that it’s dense green leaves.
+
+But when NDVI is close to zero, there are likely no green leaves and it could even be an urbanized area.
+
+NDVI is the most common index that analysts use in remote sensing. (Source: gisgeography.com)
+
+
+
+<h2>Install packages/Load Package</h2>
+
+
+```{r packages}
+
+library(raster)
+library(sf)
+library(sp)
+library(mapview)
+```
+<h2> Set Working Directory </h2>
+
+It is always best to set working directories as all files will be written or obtain from this location.
+
+```{r}
+wd <- "C:\\Users\\rramirez.STATISTICS\\Documents\\R\\RemoteSensingR\\data\\satimage\\L2A_T16QCE_A026335_20220322T162650_2022-03-22_con"
+setwd(wd)
+```
+
+<h2> Load Raster Bands to RStudio </h2>
+
+Spectral remote sensing data are collected by powerful camera-like instruments known as imaging spectrometers. Imaging spectrometers collect reflected light energy in “bands.”
+
+A band represents a segment of the electromagnetic spectrum. You can think of it as a bin of one “type” of light.
+
+<center><img src="https://www.geosage.com/highview/figures/Sentinel2_Spectral_Bands.jpg"></center>
+
+Atmospheric Transmition of the different bands from Earth.
+
+<center><img src="https://www.mdpi.com/remotesensing/remotesensing-08-00598/article_deploy/html/images/remotesensing-08-00598-g001.png"></center>
+
+```{r pressure, echo=TRUE}
+#The file name is constant so we can copy the string and paste the different band numbers 
+file_name = "\\RT_T16QCE_A026335_20220322T162650_B"
+# blue band
+b2<- raster(paste0(wd,file_name,"02.tif", sep=""))
+# green band
+b3<- raster(paste0(wd,file_name,"03.tif", sep=""))
+# red band
+b4<- raster(paste0(wd,file_name,"04.tif", sep=""))
+#veg red Edge = the region where the spectral reflectance of green vegetation rises rapidly within a certain band range
+b5<- raster(paste0(wd,file_name,"05.tif", sep=""))
+b6<- raster(paste0(wd,file_name,"06.tif", sep=""))
+b7<- raster(paste0(wd,file_name,"07.tif", sep=""))
+# NIR = near infrared
+b8<- raster(paste0(wd,file_name,"08.tif", sep=""))
+# vegetion red edge
+b8A<- raster(paste0(wd,file_name,"8A.tif", sep=""))
+#short wave infrared
+b11<- raster(paste0(wd,file_name,"11.tif", sep=""))
+b12<- raster(paste0(wd,file_name,"12.tif", sep=""))
+```
+
+Stack the raster bands and explore the data.
+```{r, echo=TRUE}
+bzRGB <- stack(list(b4, b3, b2))
+bzRGB
+```
+
+View the histogram of the red, green and blue bands
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+
+par(mfrow=c(2,2))
+hist(b4, col='#FF0000', main = "Band 04: Red")
+hist(b3, col ='#50C878', main = "Band 03: Green") 
+hist(b2, col='#0000FF', main = "Band 02: Blue")
+```
+
+View the image in human readable true color composite. 
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+
+plotRGB(bzRGB, axes = TRUE, stretch = "lin", main = "Sentinel RGB True Color Composite")
+```
+<h2><b>Calculate the NDVI</h2></b>
+
+The Normalized Difference Vegetation Index takes into account the amount of near-infrared (NIR) reflected by plants. It is calculated by dividing the difference between the reflectances (Rho) in the near-infrared and red by the sum of the two.  NDVI values typically range between negative one (surface water) and one (full, vibrant canopy). Low values (0.1 – 0.4) indicate sparse canopies, while higher values (0.7 – 0.9) suggest full, active canopies.  
+
+<center><img src= "https://i0.wp.com/www.environmentalbiophysics.org/wp-content/uploads/2017/02/Screen-Shot-2017-02-01-at-10.43.41-PM.png" width= "225" height = "125"></center>
+
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+#Calculate the Normalized Difference Vegetation Index
+ndvi <- (b8 - b4) / (b8 + b4)
+
+#View the NDVI
+plot(ndvi, rev(terrain.colors(10)), main = 'Sentinel-2 NDVI - Belize Coast')
+```
+See the distribution of the NDVI Values.
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+hist(ndvi,
+     main = "Distribution of NDVI values",
+     xlab = "NDVI",
+     ylab= "Frequency",
+     col = "aquamarine3", #color in R 
+     xlim = c(-0.5, 1),
+     breaks = 30,
+     xaxt = 'n') # stat frequency 
+axis(side = 1, at = seq(-0.5,1, 0.05), labels = seq(-0.5,1, 0.05))
+```
+We are reclassifying our object and making all values between negative infinity and 0.4 be NAs
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+
+veg <- reclassify(ndvi, cbind(-Inf, 0.4, NA))
+```
+
+We plot the Vegetation Cover.
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+
+plot(veg, main = 'Vegitation Cover')
+```
+
+We can also create an interactive map to see the data.
+```{r leaflet, warning=FALSE, fig.align = 'center', echo=TRUE}
+mapviewOptions(basemaps.color.shuffle = FALSE) # change default enhance contrast based on layer color
+mapviewOptions(basemaps =c("Esri.WorldImagery", "CartoDB.DarkMatter", "CartoDB.Positron", "OpenStreetMap", "OpenTopoMap")) #change order of basemap
+map<- mapview(veg) #create a mapview object
+map2<- mapview::viewRGB(bzRGB, r = 1, g = 2, b = 3) # true-color of raster stack
+map3 <- map2 + map #add maps together
+map3 # view the map
+```
+<br>
+We can also write raster to file and open in other Desktop GIS application like QGIS.
+```{r, warning=FALSE, fig.align = 'center', echo=TRUE}
+#writeRaster(x = veg,
+            # where your file will go - update with your file path!
+#            filename="C:\\Users\\rramirez.STATISTICS\\Documents\\R\\RemoteSensingR\\data\\veg_2022.tif", 	
+#            format = "GTiff", 					# save as a tif
+#            datatype = 'INT2S') 
+
+```
+
+
+<center><b>--END--</b></center>
